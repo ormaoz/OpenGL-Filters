@@ -2,51 +2,39 @@
 #include <math.h>
 #include "glut.h"
 
-
-
 GLuint texture[4];
 GLuint bitTex;
-//first image
 GLubyte *pic;
-GLubyte *sharp;
+GLubyte *detailed;
 GLubyte *blur5;
 GLubyte *blur3;
 GLubyte *halftone;
-GLubyte *halftoneSmall;
 GLubyte *floydSteinberg;
 GLint *floydTmp;
 GLint width;
 GLint height;
-
+FILE *f;
+int picSize;
+int rd;
+GLubyte header[54];
+GLubyte colorTable[1024];
 
 void init()
 {
-	FILE *f;
-	int picSize;
-	int rd;
-	GLubyte header[54];
-	GLubyte colorTable[1024];
-
 	glEnable(GL_TEXTURE_2D);
 
 	glOrtho(-1.0, 1.0, -1.0, 1.0, 2.0, -2.0);
-	//gluPerspective(20,1,0.5,8);
-	//glTranslatef(0,0,-4);
 
 	glClearColor(0, 0, 0, 0);
-	//glEnable(GL_DEPTH_TEST);
-	//glDepthFunc(GL_LEQUAL);
-	//	glDisable(GL_BLEND);
 	f = fopen("lena.bmp", "rb");
 
 	/*************************/
-	//first image header reading
+	//original image header reading
 	fread(header, 54, 1, f);
 	if (header[0] != 'B' || header[1] != 'M')
 		exit(1);  //not a BMP file
 	for (int i = 0; i<54; i++)
 		printf("%x  ", header[i]);
-
 
 	picSize = (*(int*)(header + 2) - 54);
 	width = *(int*)(header + 18);
@@ -58,45 +46,58 @@ void init()
 	pic = new GLubyte[picSize];
 	rd = fread(pic, 1, picSize, f); //read image
 
+	
+
+	
+
+
+
+	/**********************************/
+
+
+	printf("texture\n");
+
+}
+
+void detaildPicture() {
 	// blur picture 5x5 filter
 	blur5 = new GLubyte[picSize];
 
-	// sharpen picture
-	sharp = new GLubyte[picSize];
+	// detailed picture
+	detailed = new GLubyte[picSize];
 
-	// blur picture 3x3 filer (to be used for the halftone)
-	blur3 = new GLubyte[picSize];
-
-	// halftone picture
-	halftone = new GLubyte[picSize*9];
-	halftoneSmall = new GLubyte[picSize];
-
-	// Floyd-Steinberg picture
-	floydSteinberg = new GLubyte[picSize];
-	floydTmp = new GLint[picSize];
-	fclose(f);
-	
-	int result;
+	// Creating the blured picture first: 5x5 filter: 
 	for (int i = 0; i < height*width; i++) {
-		result =	(pic[i]) + (pic[i - 1]) + (pic[i - 2]) + (pic[i + 1]) + (pic[i + 2]) +
-					(pic[i + width]) + (pic[i - 1 + width]) + (pic[i - 2 + width]) + (pic[i + 1 + width]) + (pic[i + 2 + width]) +
-					(pic[i - width]) + (pic[i - 1 - width]) + (pic[i - 2 - width]) + (pic[i + 1 - width]) + (pic[i + 2 - width]) +
-					(pic[i + 2 * width]) + (pic[i - 1 + 2 * width]) + (pic[i - 2 + 2 * width]) + (pic[i + 1 + 2 * width]) + (pic[i + 2 + 2 * width]) +
-					(pic[i - 2 * width]) + (pic[i - 1 - 2 * width]) + (pic[i - 2 - 2 * width]) + (pic[i + 1 - 2 * width]) + (pic[i + 2 - 2 * width]);
+		int result = (pic[i]) + (pic[i - 1]) + (pic[i - 2]) + (pic[i + 1]) + (pic[i + 2]) +
+			(pic[i + width]) + (pic[i - 1 + width]) + (pic[i - 2 + width]) + (pic[i + 1 + width]) + (pic[i + 2 + width]) +
+			(pic[i - width]) + (pic[i - 1 - width]) + (pic[i - 2 - width]) + (pic[i + 1 - width]) + (pic[i + 2 - width]) +
+			(pic[i + 2 * width]) + (pic[i - 1 + 2 * width]) + (pic[i - 2 + 2 * width]) + (pic[i + 1 + 2 * width]) + (pic[i + 2 + 2 * width]) +
+			(pic[i - 2 * width]) + (pic[i - 1 - 2 * width]) + (pic[i - 2 - 2 * width]) + (pic[i + 1 - 2 * width]) + (pic[i + 2 - 2 * width]);
 		blur5[i] = result / 25;
 	}
 
+	// After creating the blured 5x5, sub it from the original 8 bit picture and conduct treshhold 
 	for (int i = 0; i < height*width; i++) {
-		sharp[i] = pic[i] - blur5[i];
-		if (sharp[i] >= 30) {
-			sharp[i] = 255;
-		} else {
-			sharp[i] = 0;
+		detailed[i] = pic[i] - blur5[i];
+		if (detailed[i] >= 30) {
+			detailed[i] = 255;
+		}
+		else {
+			detailed[i] = 0;
 		}
 	}
+}
+
+void halftonePicture() {
 	
-	
-	//First I'm creating a blured pictures with 3x3 filter
+	// Blured picture 3x3 filer (to be used for the halftone)
+	blur3 = new GLubyte[picSize];
+
+	// Halftone picture
+	halftone = new GLubyte[picSize * 9];
+	halftoneSmall = new GLubyte[picSize];
+
+	// First I'm creating a blured pictures with 3x3 filter
 	int result2;
 	for (int i = 0; i < height*width; i++) {
 		result2 = (pic[i]) + (pic[i - 1]) + (pic[i + 1]) +
@@ -106,15 +107,11 @@ void init()
 	}
 	// Next, for every third pixel in the blured picture (which contains the avarge of the original its
 	// 9 neighbours in the original picture, I'll check it's value between 0 to 1 (devided to 1/10 groups)
-	for (int i = 1; i < height; i+=3) {
-		for (int j = 1; j < width; j+=3) {
-		//	int t=i*width + j;
-			
-			// indexes for the bigger picture
-		//	int newI = i * 3 + 1;
-		//	int newJ = j * 3 + 1;
+	for (int i = 1; i < height; i += 3) {
+		for (int j = 1; j < width; j += 3) {
 			int k = i*width + j;
 
+			// 0 to 0.1 case
 			if (blur3[k] < 255 * 0 && blur3[k] < 255 * 0.1) {
 				halftone[k] = 0; // middle
 				halftone[k - 1] = 0; // left
@@ -127,6 +124,7 @@ void init()
 				halftone[k + 1 - width] = 0; // bottom right
 
 			}
+			// 0.1 to 0.2 case
 			else if (blur3[k] >= 255 * 0.1 && blur3[k] < 255 * 0.2) {
 				halftone[k] = 255;
 				halftone[k - 1] = 0;
@@ -138,6 +136,7 @@ void init()
 				halftone[k - 1 - width] = 0;
 				halftone[k + 1 - width] = 0;
 			}
+			// 0.2 to 0.3 case
 			else if (blur3[k] >= 255 * 0.2 && blur3[k] < 255 * 0.3) {
 				halftone[k] = 255;
 				halftone[k - 1] = 0;
@@ -149,6 +148,7 @@ void init()
 				halftone[k - 1 - width] = 0;
 				halftone[k + 1 - width] = 0;
 			}
+			// 0.3 to 0.4 case
 			else if (blur3[k] >= 255 * 0.3 && blur3[k] < 255 * 0.4) {
 				halftone[k] = 255;
 				halftone[k - 1] = 0;
@@ -160,6 +160,7 @@ void init()
 				halftone[k - 1 - width] = 0;
 				halftone[k + 1 - width] = 0;
 			}
+			// 0.4 to 0.5 case
 			else if (blur3[k] >= 255 * 0.4 && blur3[k] < 255 * 0.5) {
 				halftone[k] = 255;
 				halftone[k - 1] = 0;
@@ -171,6 +172,7 @@ void init()
 				halftone[k - 1 - width] = 255;
 				halftone[k + 1 - width] = 0;
 			}
+			// 0.5 to 0.6 case
 			else if (blur3[k] >= 255 * 0.5 && blur3[k] < 255 * 0.6) {
 				halftone[k] = 255;
 				halftone[k - 1] = 255;
@@ -182,6 +184,7 @@ void init()
 				halftone[k - 1 - width] = 255;
 				halftone[k + 1 - width] = 0;
 			}
+			// 0.6 to 0.7 case
 			else if (blur3[k] >= 255 * 0.6 && blur3[k] < 255 * 0.7) {
 				halftone[k] = 255;
 				halftone[k - 1] = 255;
@@ -193,6 +196,7 @@ void init()
 				halftone[k - 1 - width] = 255;
 				halftone[k + 1 - width] = 255;
 			}
+			// 0.7 to 0.8 case
 			else if (blur3[k] >= 255 * 0.7 && blur3[k] < 255 * 0.8) {
 				halftone[k] = 255;
 				halftone[k - 1] = 255;
@@ -204,6 +208,7 @@ void init()
 				halftone[k - 1 - width] = 255;
 				halftone[k + 1 - width] = 255;
 			}
+			// 0.8 to 0.9 case
 			else if (blur3[k] >= 255 * 0.8 && blur3[k] < 255 * 0.9) {
 				halftone[k] = 255;
 				halftone[k - 1] = 255;
@@ -215,6 +220,7 @@ void init()
 				halftone[k - 1 - width] = 255;
 				halftone[k + 1 - width] = 255;
 			}
+			// 0.9 to 1 case
 			else if (blur3[k] >= 255 * 0.9 && blur3[k] < 255) {
 				halftone[k] = 255;
 				halftone[k - 1] = 255;
@@ -228,28 +234,41 @@ void init()
 			}
 		}
 	}
+}
+
+void floydSteinbergPicture() {
+	
+	// Floyd-Steinberg picture
+	floydSteinberg = new GLubyte[picSize];
+	floydTmp = new GLint[picSize];
+	fclose(f);
+
+
+
+
+
 	/*
 	for(int i = 0; i < height*width; i++) {
-		for (int j = (i - 2); j <= (i + 2); j++) {
-			for (int k = (height - 2); k <= (height + 2); k++) {
-				sharp[i] += pic[j+k]/25;
-			}
-		}
+	for (int j = (i - 2); j <= (i + 2); j++) {
+	for (int k = (height - 2); k <= (height + 2); k++) {
+	detailed[i] += pic[j+k]/25;
+	}
+	}
 	} */
 
 
-	for (int i = height-1; i >= 0; i--) {
+	for (int i = height - 1; i >= 0; i--) {
 		for (int j = 0; j < width; j++) {
 			int k = i*width + j;
 			// Round the color to 16 grey scale
-			int rounded= int(pic[k]/16) * 16;
-			
-		//	printf("        %d ---> %d     ", pic[k], rounded);
+			int rounded = int(pic[k] / 16) * 16;
+
+			//	printf("        %d ---> %d     ", pic[k], rounded);
 
 			// Calculate error
 			floydTmp[k] = rounded;
 			int error = pic[k] - rounded;
-			if (i == 0 && j != width-1) {
+			if (i == 0 && j != width - 1) {
 				int tmp = int((7.0 / 16.0)*error);
 				floydTmp[k + 1] += tmp;
 			}
@@ -269,117 +288,17 @@ void init()
 				tmp = int((1.0 / 16.0)*error);
 				floydTmp[k - width + 1] += tmp;
 			}
-			
-
-			
-
-
-
-	/*		void buildFloidSteinberg(GLubyte *picture) {
-
-				GLint *floid = new GLint[picSize];
-
-				float error;
-				int rounded;
-				float alpha = 7.0 / 16.0, beta = 3.0 / 16.0, gamma = 5.0 / 16.0, delta = 1.0 / 16.0;
-
-				for (int i = 0; i < picSize; i++) {
-					floid[i] = picture[i];
-				}
-
-				for (int i = height - 1; i >= 0; i--) {
-					for (int j = 0; j < width - 1; j++) {
-
-						rounded = ((floid[(i * width) + j] + 8) / 16) * 16;
-						error = floid[(i * width) + j] - rounded;
-						floid[(i * width) + j] = rounded;
-
-						if (i == 0) {
-							floid[(i * width) + j + 1] += int(alpha * error + 0.5);
-						}
-						else if (j == width - 1) {
-							floid[((i - 1) * width) + j - 1] += int(beta * error + 0.5);
-							floid[((i - 1) * width) + j] += int(gamma * error + 0.5);
-						}
-						else {
-							floid[(i * width) + j + 1] += int(alpha  * error + 0.5);
-							floid[((i - 1) * width) + j - 1] += int(beta * error + 0.5);
-							floid[((i - 1) * width) + j] += int(gamma * error + 0.5);
-							floid[((i - 1) * width) + j + 1] += int(delta * error + 0.5);
-						}
-					}
-				}
-
-				GLubyte *res = new GLubyte[picSize];
-				for (int i = 0; i < picSize; i++) {
-					res[i] = floid[i];
-				}
-
-				buildTexture(res, FLOYD_STEINBERG);
-			}
-
-			*/
-
-
-		//	printf("error is: %d     tmp is: %d      rounded is: %d\n", error, tmp, rounded);
-
 		}
 	}
 	for (int i = 0; i < picSize; i++) {
 		floydSteinberg[i] = floydTmp[i];
 	}
-	
-	printf("*****  %d *******\n", rd);
+}
 
-	/**********************************/
-
-
-	printf("texture\n");
-
-	//************ first image - bottom left **************************
-	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-	glGenTextures(1, &texture[0]);  //generate place for new texture
-	glBindTexture(GL_TEXTURE_2D, texture[0]); // initialize first texure 
-
-	//texture properties
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	//build texture
-	/*gluScaleImage(GL_LUMINANCE, width * 3, height * 3, GL_UNSIGNED_BYTE, halftone, width, height, GL_UNSIGNED_BYTE, halftoneSmall);
-	for (int i = 0; i<width; i++) {
-		for (int j = 0; j<height; j++) {
-			if (halftoneSmall[i + j*width]>48)
-				halftoneSmall[i + j*width] = 255;
-			else  {
-				halftoneSmall[i + j*width] = 0;
-			}
-		}
-	}*/
-
-	//gluScaleImage(GL_LUMINANCE, 768, 768, GL_UNSIGNED_BYTE, halftone, 256, 256, GL_UNSIGNED_BYTE, halftoneSmall);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
-	
+void textures() {
 
 
-	
-	//************ second image - top right **************************
-	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-	glGenTextures(1, &texture[1]);  //generate place for new texture
-	glBindTexture(GL_TEXTURE_2D, texture[1]); // initialize first texure 
-
-	//texture properties
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	//build texture
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, sharp);
-
-	//************ third image - top left **************************
+	//************ First image - top left **************************
 	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 	glGenTextures(1, &texture[2]);  //generate place for new texture
 	glBindTexture(GL_TEXTURE_2D, texture[2]); // initialize first texure 
@@ -393,7 +312,37 @@ void init()
 	//build texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, pic);
 
-	//************ fourth image - bottom right **************************
+
+	//************ second image - top right **************************
+	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+	glGenTextures(1, &texture[1]);  //generate place for new texture
+	glBindTexture(GL_TEXTURE_2D, texture[1]); // initialize first texure 
+
+	//texture properties
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	//build texture
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, detailed);
+
+
+
+	//************ Third image - bottom left **************************
+	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+	glGenTextures(1, &texture[0]);  //generate place for new texture
+	glBindTexture(GL_TEXTURE_2D, texture[0]); // initialize first texure 
+
+	//texture properties
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
+
+	//************ Fourth image - bottom right **************************
 	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 	glGenTextures(1, &texture[3]);  //generate place for new texture
 	glBindTexture(GL_TEXTURE_2D, texture[3]); // initialize first texure 
@@ -406,10 +355,7 @@ void init()
 
 	//build texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, floydSteinberg);
-	
 }
-
-
 
 void mydisplay(void){
 
@@ -499,8 +445,7 @@ void mydisplay(void){
 	glFlush();
 }
 
-int main(int  argc, char** argv)
-{
+int main(int  argc, char** argv) {
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
@@ -514,12 +459,5 @@ int main(int  argc, char** argv)
 	//glHint(GL_PERSPECTIVE_CORRECTION_HINT,GL_NICEST);
 	glutMainLoop();
 
-	delete(pic);
-	
-	FILE *txt;
-	txt = fopen("C:\1.txt", "w+");
-	(txt, "blabla");
-	fclose(txt);
-
-
+	delete(pic);	
 }
