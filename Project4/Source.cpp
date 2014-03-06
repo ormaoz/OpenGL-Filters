@@ -13,51 +13,10 @@ GLubyte *floydSteinberg;
 GLint *floydTmp;
 GLint width;
 GLint height;
-FILE *f;
 int picSize;
 int rd;
 GLubyte header[54];
 GLubyte colorTable[1024];
-
-void init()
-{
-	glEnable(GL_TEXTURE_2D);
-
-	glOrtho(-1.0, 1.0, -1.0, 1.0, 2.0, -2.0);
-
-	glClearColor(0, 0, 0, 0);
-	f = fopen("lena.bmp", "rb");
-
-	/*************************/
-	//original image header reading
-	fread(header, 54, 1, f);
-	if (header[0] != 'B' || header[1] != 'M')
-		exit(1);  //not a BMP file
-	for (int i = 0; i<54; i++)
-		printf("%x  ", header[i]);
-
-	picSize = (*(int*)(header + 2) - 54);
-	width = *(int*)(header + 18);
-	height = *(int*)(header + 22);
-	printf("\n%d %d %d %d \n", picSize, width, height, width*height * 3);
-
-	/**********************************/
-
-	pic = new GLubyte[picSize];
-	rd = fread(pic, 1, picSize, f); //read image
-
-	
-
-	
-
-
-
-	/**********************************/
-
-
-	printf("texture\n");
-
-}
 
 void detaildPicture() {
 	// blur picture 5x5 filter
@@ -89,13 +48,12 @@ void detaildPicture() {
 }
 
 void halftonePicture() {
-	
+
 	// Blured picture 3x3 filer (to be used for the halftone)
 	blur3 = new GLubyte[picSize];
 
 	// Halftone picture
 	halftone = new GLubyte[picSize * 9];
-	halftoneSmall = new GLubyte[picSize];
 
 	// First I'm creating a blured pictures with 3x3 filter
 	int result2;
@@ -237,11 +195,10 @@ void halftonePicture() {
 }
 
 void floydSteinbergPicture() {
-	
+
 	// Floyd-Steinberg picture
 	floydSteinberg = new GLubyte[picSize];
 	floydTmp = new GLint[picSize];
-	fclose(f);
 
 
 
@@ -356,6 +313,44 @@ void textures() {
 	//build texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, floydSteinberg);
 }
+void init()
+{
+	FILE *f;
+	// Basic settings for the window
+	glEnable(GL_TEXTURE_2D);
+	glOrtho(-1.0, 1.0, -1.0, 1.0, 2.0, -2.0);
+	glClearColor(0, 0, 0, 0);
+
+	// Open the file
+	f = fopen("lena.bmp", "rb");
+
+	//original image header reading
+	fread(header, 54, 1, f);
+	if (header[0] != 'B' || header[1] != 'M')
+		exit(1);  //not a BMP file
+	//	for (int i = 0; i<54; i++)
+	//		printf("%x  ", header[i]);
+
+	picSize = (*(int*)(header + 2) - 54);
+	width = *(int*)(header + 18);
+	height = *(int*)(header + 22);
+	//	printf("\n%d %d %d %d \n", picSize, width, height, width*height * 3);
+
+	// Initilize the original picture
+	pic = new GLubyte[picSize];
+	//read image
+	rd = fread(pic, 1, picSize, f);
+
+	detaildPicture();
+	halftonePicture();
+	floydSteinbergPicture();
+	textures();
+
+	//	printf("texture\n");
+	fclose(f);
+}
+
+
 
 void mydisplay(void){
 
@@ -382,7 +377,7 @@ void mydisplay(void){
 	glVertex3f(-1.0, 1.0f, 1.0);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
+
 	glViewport(256, 256, 256, 256); // top right
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
@@ -404,7 +399,7 @@ void mydisplay(void){
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	
+
 	glViewport(0, 256, 256, 256); // top left
 	glBindTexture(GL_TEXTURE_2D, texture[2]); //using third texture
 	//glScalef(0.5,0.5,1);
@@ -441,7 +436,7 @@ void mydisplay(void){
 	glVertex3f(-1.0, 1.0f, -1.0);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
+
 	glFlush();
 }
 
@@ -452,6 +447,8 @@ int main(int  argc, char** argv) {
 	glutInitWindowSize(512, 512);
 	glutCreateWindow("Simple");
 	init();
+	
+
 	// glutReshapeFunc(myReshape);
 	glutDisplayFunc(mydisplay);
 	//glutIdleFunc(mydisplay);
@@ -459,5 +456,5 @@ int main(int  argc, char** argv) {
 	//glHint(GL_PERSPECTIVE_CORRECTION_HINT,GL_NICEST);
 	glutMainLoop();
 
-	delete(pic);	
+	delete(pic);
 }
