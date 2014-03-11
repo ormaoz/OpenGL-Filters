@@ -285,10 +285,14 @@ void bitmapPictures() {
 	//for (int i = 0; i < picSize/8; i++) {
 		//printf("%d ", bitHalftone[i]);
 	//}
+	
+	// This part isn't wirking at the moment *****************************************************************************************************
+	/*
 	glRasterPos2f(20, 20);
 	glGetFloatv(GL_CURRENT_RASTER_POSITION_VALID, c);
 	glOrtho(0, 512, 0, 512, -1.0, 1.0);
 	glBitmap(12, 7, 0, 0, 11, 0, bitHalftone);
+	*/
 }
 
 void textures() {
@@ -340,7 +344,8 @@ void textures() {
 	// BONUS
 	bitmapPictures();
 	
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
+	// We'll need to delete this line when the bouns will work
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
 
 	//************ Fourth image - bottom right **************************
 	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
