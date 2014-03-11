@@ -2,6 +2,7 @@
 #include <math.h>
 #include "glut.h"
 
+
 GLuint texture[4];
 GLuint bitTex;
 GLubyte *pic;
@@ -17,6 +18,8 @@ int picSize;
 int rd;
 GLubyte header[54];
 GLubyte colorTable[1024];
+GLubyte *bitHalftone;
+GLubyte *bitDetailed;
 
 void detaildPicture() {
 	// blur picture 5x5 filter
@@ -26,26 +29,37 @@ void detaildPicture() {
 	detailed = new GLubyte[picSize];
 
 	// Creating the blured picture first: 5x5 filter: 
-	for (int i = 0; i < height*width; i++) {
-		int result = (pic[i]) + (pic[i - 1]) + (pic[i - 2]) + (pic[i + 1]) + (pic[i + 2]) +
-			(pic[i + width]) + (pic[i - 1 + width]) + (pic[i - 2 + width]) + (pic[i + 1 + width]) + (pic[i + 2 + width]) +
-			(pic[i - width]) + (pic[i - 1 - width]) + (pic[i - 2 - width]) + (pic[i + 1 - width]) + (pic[i + 2 - width]) +
-			(pic[i + 2 * width]) + (pic[i - 1 + 2 * width]) + (pic[i - 2 + 2 * width]) + (pic[i + 1 + 2 * width]) + (pic[i + 2 + 2 * width]) +
-			(pic[i - 2 * width]) + (pic[i - 1 - 2 * width]) + (pic[i - 2 - 2 * width]) + (pic[i + 1 - 2 * width]) + (pic[i + 2 - 2 * width]);
-		blur5[i] = result / 25;
-	}
+	int result = 0;
+	int counter = 0;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			for (int x = -2; x <= 2; x++) {
+				for (int y = -2; y <= 2; y++) {
 
-	// After creating the blured 5x5, sub it from the original 8 bit picture and conduct treshhold 
-	for (int i = 0; i < height*width; i++) {
-		detailed[i] = pic[i] - blur5[i];
-		if (detailed[i] >= 30) {
-			detailed[i] = 255;
-		}
-		else {
-			detailed[i] = 0;
+					// Dealing with edeges
+					if (j + y > 0 && j + y < width && i + x > 0 && i + x < height) {
+						int index = (i+x)*width + (j+y);
+						counter++;
+						result += pic[index];
+					}
+				}
+			}
+			int k = i*width + j;
+			blur5[k] = result / counter;
+			counter = 0;
+			result = 0;
+			// After creating the blured 5x5, sub it from the original 8 bit picture and conduct treshhold 
+			int temp = abs(pic[k] - blur5[k]);
+			if (temp >= 30) {
+				detailed[k] = 255;
+			
+			}
+			else {
+				detailed[i*width + j] = 0;
+			}
 		}
 	}
-}
+}	
 
 void halftonePicture() {
 
@@ -53,16 +67,33 @@ void halftonePicture() {
 	blur3 = new GLubyte[picSize];
 
 	// Halftone picture
-	halftone = new GLubyte[picSize * 9];
+	halftone = new GLubyte[picSize];
 
 	// First I'm creating a blured pictures with 3x3 filter
-	int result2;
-	for (int i = 0; i < height*width; i++) {
-		result2 = (pic[i]) + (pic[i - 1]) + (pic[i + 1]) +
-			(pic[i + width]) + (pic[i - 1 + width]) + (pic[i + 1 + width]) +
-			(pic[i - width]) + (pic[i - 1 - width]) + (pic[i + 1 - width]);
-		blur3[i] = result2 / 9;
+	int result = 0;
+	int counter = 0;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			for (int x = -1; x <= 1; x++) {
+				for (int y = -1; y <= 1; y++) {
+
+					// Dealing with edeges
+					if (j + y > 0 && j + y < width && i + x > 0 && i + x < height) {
+						int index = (i + x)*width + (j + y);
+						counter++;
+						result += pic[index];
+					}
+				}
+			}
+			int k = i*width + j;
+			blur3[k] = result / counter;
+			counter = 0;
+			result = 0;
+			// After creating the blured 3x3, sub it from the original 8 bit picture and conduct treshhold 
+			int temp = abs(pic[k] - blur3[k]);
+		}
 	}
+
 	// Next, for every third pixel in the blured picture (which contains the avarge of the original its
 	// 9 neighbours in the original picture, I'll check it's value between 0 to 1 (devided to 1/10 groups)
 	for (int i = 1; i < height; i += 3) {
@@ -70,7 +101,7 @@ void halftonePicture() {
 			int k = i*width + j;
 
 			// 0 to 0.1 case
-			if (blur3[k] < 255 * 0 && blur3[k] < 255 * 0.1) {
+			if (blur3[k] >= 255 * 0 && blur3[k] < 255 * 0.1) {
 				halftone[k] = 0; // middle
 				halftone[k - 1] = 0; // left
 				halftone[k + 1] = 0; // right
@@ -199,57 +230,65 @@ void floydSteinbergPicture() {
 	// Floyd-Steinberg picture
 	floydSteinberg = new GLubyte[picSize];
 	floydTmp = new GLint[picSize];
-
-
-
-
-
-	/*
-	for(int i = 0; i < height*width; i++) {
-	for (int j = (i - 2); j <= (i + 2); j++) {
-	for (int k = (height - 2); k <= (height + 2); k++) {
-	detailed[i] += pic[j+k]/25;
+	int rounded;
+	float error;
+	for (int i = 0; i < picSize; i++) {
+		floydTmp[i] = pic[i];
 	}
-	}
-	} */
-
-
+	float alpha = 7.0 / 16.0, beta = 3.0 / 16.0, gamma = 5.0 / 16.0, delta = 1.0 / 16.0;
 	for (int i = height - 1; i >= 0; i--) {
 		for (int j = 0; j < width; j++) {
-			int k = i*width + j;
+			int k = (i*width) + j;
 			// Round the color to 16 grey scale
-			int rounded = int(pic[k] / 16) * 16;
-
-			//	printf("        %d ---> %d     ", pic[k], rounded);
-
+			rounded = ((floydTmp[(i * width) + j] + 8) / 16) * 16;
 			// Calculate error
+			error = floydTmp[k] - rounded;
 			floydTmp[k] = rounded;
-			int error = pic[k] - rounded;
-			if (i == 0 && j != width - 1) {
-				int tmp = int((7.0 / 16.0)*error);
-				floydTmp[k + 1] += tmp;
+
+			if (i == 0) {
+				floydTmp[k + 1] += int(alpha*error + 0.5);
 			}
 			else if (j == width - 1) {
-				int tmp = int((3.0 / 16.0)*error);
-				floydTmp[k - width - 1] += tmp;
-				tmp = int((5.0 / 16.0)*error);
-				floydTmp[k - width] += tmp;
+				floydTmp[k - width - 1] += int(beta*error + 0.5);
+				floydTmp[k - width] += int(gamma*error + 0.5);
 			}
 			else {
-				int tmp = int((7.0 / 16.0)*error);
-				floydTmp[k + 1] += tmp;
-				tmp = int((3.0 / 16.0)*error);
-				floydTmp[k - width - 1] += tmp;
-				tmp = int((5.0 / 16.0)*error);
-				floydTmp[k - width] += tmp;
-				tmp = int((1.0 / 16.0)*error);
-				floydTmp[k - width + 1] += tmp;
+				floydTmp[k + 1] += int(alpha*error + 0.5);
+				floydTmp[k - width - 1] += int(beta*error + 0.5);
+				floydTmp[k - width] += int(gamma*error + 0.5);
+				floydTmp[k - width + 1] += int(delta*error + 0.5);
 			}
 		}
 	}
 	for (int i = 0; i < picSize; i++) {
 		floydSteinberg[i] = floydTmp[i];
 	}
+}
+
+void bitmapPictures() {
+	bitHalftone = new GLubyte[picSize / 8];
+	GLubyte check[] = { 255, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 0 };
+	int eightBits = 0;
+	int bitLocation = 128;
+	for (int i = 0; i < picSize; i++) {
+		if (halftone[i] != 0) {
+			eightBits = eightBits | bitLocation;
+		}
+		bitLocation = bitLocation >> 1;
+		if (bitLocation < 1) {
+			bitLocation = 128;
+			bitHalftone[i / 8] = eightBits;
+			eightBits = 0;
+		}
+
+	}
+	//for (int i = 0; i < picSize/8; i++) {
+		//printf("%d ", bitHalftone[i]);
+	//}
+	glRasterPos2f(20, 20);
+	glGetFloatv(GL_CURRENT_RASTER_POSITION_VALID, c);
+	glOrtho(0, 512, 0, 512, -1.0, 1.0);
+	glBitmap(12, 7, 0, 0, 11, 0, bitHalftone);
 }
 
 void textures() {
@@ -296,8 +335,12 @@ void textures() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
+	
+	
+	// BONUS
+	bitmapPictures();
+	
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, halftone);
 
 	//************ Fourth image - bottom right **************************
 	//glPixelStorei(GL_UNPACK_ALIGNMENT,1);
@@ -313,6 +356,33 @@ void textures() {
 	//build texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, floydSteinberg);
 }
+
+void printToTXT() {
+	FILE *img4, *img5, *img6;
+	img4 = fopen("img4.txt", "w");
+	img5 = fopen("img5_s.txt", "w");
+	img6 = fopen("img6.txt", "w");
+	for (int i = 0; i < height*width; i++) {
+		if (detailed[i] == 255) {
+			fprintf(img4, "%d,", 1);
+		}
+		else {
+			fprintf(img4, "%d,", detailed[i]);
+		}
+		if (halftone[i] == 255) {
+			fprintf(img5, "%d,", 1);
+
+		}
+		else {
+			fprintf(img5, "%d,", halftone[i]);
+		}
+		fprintf(img6, "%d,", floydSteinberg[i]/16);
+	}
+	fclose(img4);
+	fclose(img5);
+	fclose(img6);
+}
+
 void init()
 {
 	FILE *f;
@@ -320,6 +390,8 @@ void init()
 	glEnable(GL_TEXTURE_2D);
 	glOrtho(-1.0, 1.0, -1.0, 1.0, 2.0, -2.0);
 	glClearColor(0, 0, 0, 0);
+
+	GLubyte colorTable[1024];   
 
 	// Open the file
 	f = fopen("lena.bmp", "rb");
@@ -336,6 +408,8 @@ void init()
 	height = *(int*)(header + 22);
 	//	printf("\n%d %d %d %d \n", picSize, width, height, width*height * 3);
 
+	fread(colorTable, 1, 1024, f);
+
 	// Initilize the original picture
 	pic = new GLubyte[picSize];
 	//read image
@@ -348,9 +422,9 @@ void init()
 
 	//	printf("texture\n");
 	fclose(f);
+
+	printToTXT();
 }
-
-
 
 void mydisplay(void){
 
@@ -448,13 +522,11 @@ int main(int  argc, char** argv) {
 	glutCreateWindow("Simple");
 	init();
 	
-
 	// glutReshapeFunc(myReshape);
 	glutDisplayFunc(mydisplay);
 	//glutIdleFunc(mydisplay);
 	// printf("pi = %f",3.14);
 	//glHint(GL_PERSPECTIVE_CORRECTION_HINT,GL_NICEST);
 	glutMainLoop();
-
 	delete(pic);
 }
